@@ -27,7 +27,7 @@ endif()
 
 find_package(Qt6 COMPONENTS Widgets Core)
 target_link_libraries(${PROJECT_NAME} PRIVATE Qt6::Core Qt6::Widgets)
-if(OS_LINUX OR OS_FREEBSD OR OS_OPENBSD)
+if((OS_LINUX OR OS_FREEBSD OR OS_OPENBSD) AND Qt_VERSION VERSION_LESS "6.9.0")
 	target_link_libraries(${PROJECT_NAME} PRIVATE Qt::GuiPrivate)
 endif()
 

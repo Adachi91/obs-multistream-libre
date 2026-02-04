@@ -59,6 +59,7 @@ private:
 public:
 	OutputDialog(QDialog *parent, QStringList otherNames);
 	OutputDialog(QDialog *parent, QString name, QString server, QString key, QStringList otherNames);
+	~OutputDialog();
 
 	QString outputName;
 	QString outputServer;

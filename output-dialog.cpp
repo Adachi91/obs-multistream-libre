@@ -385,6 +385,11 @@ OutputDialog::OutputDialog(QDialog *parent, QString name, QString server, QStrin
 	show();
 }
 
+OutputDialog::~OutputDialog()
+{
+	obs_data_array_release(servicesData);
+}
+
 QWidget *OutputDialog::WizardServicePage()
 {
 	auto page = new QWidget(this);

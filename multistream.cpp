@@ -306,8 +306,8 @@ MultistreamDock::MultistreamDock(QWidget *parent) : QFrame(parent)
 	auto aggregateStatsLayout = new QVBoxLayout;
 	aggregateStatsLayout->setSpacing(2);
 	aggregateStatsLayout->setContentsMargins(8, 6, 8, 6);
-	totalBitrateLabel = new QLabel(QString::fromUtf8("Total Bitrate: 0.00 Mbit/s"));
-	droppedFramesLabel = new QLabel(QString::fromUtf8("Dropped Frames: 0 / 0 (0.00%)"));
+	totalBitrateLabel = new QLabel(QString::asprintf(obs_module_text("TotalBitrate"), 0.0));
+	droppedFramesLabel = new QLabel(QString::asprintf(obs_module_text("DroppedFrames"), 0ULL, 0ULL, 0.0));
 	aggregateStatsLayout->addWidget(totalBitrateLabel);
 	aggregateStatsLayout->addWidget(droppedFramesLabel);
 	aggregateStatsGroup->setLayout(aggregateStatsLayout);
@@ -508,7 +508,7 @@ void MultistreamDock::OpenSettingsDialog()
 }
 
 void MultistreamDock::ResetOutputStats(ManagedOutput &managedOutput) {
-  if (!managedOutput)
+  if (!managedOutput.output)
     return;
   managedOutput.last_bytes = obs_output_get_total_bytes(managedOutput.output);
   managedOutput.last_time_ns = os_gettime_ns();
@@ -546,8 +546,8 @@ void MultistreamDock::UpdateAggregateStats() {
     total += obs_output_get_total_frames(managedOutput.output);
   }
   double percent = total > 0 ? (dropped * 100.0) / total : 0.0;
-  totalBitrateLabel->setText(QString::asprintf("Total Bitrate: %.2f Mbit/s", total_bitrate));
-  droppedFramesLabel->setText(QString::asprintf("Dropped Frames: %llu / %llu (%.2f%%)", (unsigned long long)dropped, (unsigned long long)total, percent));
+  totalBitrateLabel->setText(QString::asprintf(obs_module_text("TotalBitrate"), total_bitrate));
+  droppedFramesLabel->setText(QString::asprintf(obs_module_text("DroppedFrames"), (unsigned long long)dropped, (unsigned long long)total, percent));
 }
 
 MultistreamDock::~MultistreamDock()
@@ -658,6 +658,13 @@ void MultistreamDock::LoadSettings()
 	int idx = 1;
 	while (auto item = mainCanvasOutputLayout->itemAt(idx)) {
 		auto streamGroup = item->widget();
+		std::string name = streamGroup->objectName().toUtf8().constData();
+		for (auto &mo : outputs) {
+			if (mo.name == name) {
+				mo.button = nullptr;
+				break;
+			}
+		}
 		mainCanvasOutputLayout->removeWidget(streamGroup);
 		RemoveWidget(streamGroup);
 	}
@@ -1295,6 +1302,8 @@ void MultistreamDock::storeMainStreamEncoders()
 	obs_get_video_info(&ovi);
 	double fps = ovi.fps_den > 0 ? (double)ovi.fps_num / (double)ovi.fps_den : 0.0;
 	auto output = obs_frontend_get_streaming_output();
+	if (!output)
+		return;
 	bool found = false;
 	for (auto i = 0; i < MAX_OUTPUT_VIDEO_ENCODERS; i++) {
 		auto encoder = obs_output_get_video_encoder2(output, i);

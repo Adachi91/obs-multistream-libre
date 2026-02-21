@@ -4,6 +4,7 @@
 #include <obs.h>
 #include <obs-frontend-api.h>
 #include <QFrame>
+#include <QLabel>
 #include <QPushButton>
 #include <QString>
 #include <QTimer>
@@ -42,12 +43,13 @@ private:
 	//std::vector<std::tuple<std::string, obs_output_t *, QPushButton *>> outputs;
 	struct ManagedOutput {
 		std::string name;
-          obs_output_t *output = nullptr;
-                QPushButton *button = nullptr;
-          uint64_t last_bytes = 0;
-                uint64_t last_time_ns = 0;
-          double bitrate_mbps = 0.0;
-    };
+		obs_output_t *output = nullptr;
+		QPushButton *button = nullptr;
+		uint64_t last_bytes = 0;
+		uint64_t last_time_ns = 0;
+		double bitrate_mbps = 0.0;
+	};
+	std::vector<ManagedOutput> outputs;
 	obs_data_array_t *vertical_outputs = nullptr;
 	bool exiting = false;
 

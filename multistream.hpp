@@ -26,6 +26,8 @@ private:
 	QVBoxLayout *verticalCanvasOutputLayout = nullptr;
 	QPushButton *mainStreamButton = nullptr;
 	QPushButton *configButton = nullptr;
+    QLabel *totalBitrateLabel = nullptr;
+    QLabel *droppedFramesLabel = nullptr;
 	QLabel *mainPlatformIconLabel = nullptr;
 	QString mainPlatformUrl;
 
@@ -33,10 +35,19 @@ private:
 	time_t partnerBlockTime = 0;
 
 	QTimer videoCheckTimer;
+    QTimer statsUpdateTimer;
 	video_t *mainVideo = nullptr;
 	std::vector<video_t *> oldVideo;
 
-	std::vector<std::tuple<std::string, obs_output_t *, QPushButton *>> outputs;
+	//std::vector<std::tuple<std::string, obs_output_t *, QPushButton *>> outputs;
+	struct ManagedOutput {
+		std::string name;
+          obs_output_t *output = nullptr;
+                QPushButton *button = nullptr;
+          uint64_t last_bytes = 0;
+                uint64_t last_time_ns = 0;
+          double bitrate_mbps = 0.0;
+    };
 	obs_data_array_t *vertical_outputs = nullptr;
 	bool exiting = false;
 
@@ -48,6 +59,9 @@ private:
 	bool StartOutput(obs_data_t *settings, QPushButton *streamButton);
 
 	void outputButtonStyle(QPushButton *button);
+    void UpdateAggregateStats();
+    void ResetOutputStats(ManagedOutput &managedOutput);
+    void OpenSettingsDialog();
 
 	void storeMainStreamEncoders();
 

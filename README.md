@@ -1,5 +1,5 @@
 # obs-multistream-libre
-Community fork of [Aitum Multistream](https://github.com/aitum/obs-aitum-multistream) for [OBS Studio](https://github.com/obsproject/obs-studio). Adds multi-streaming capability, supporting Twitch, YouTube, Kick, Rumble, TikTok, and more with custom RTMP destination.
+Community fork of [Aitum Multistream](https://github.com/aitum/obs-aitum-multistream) for [OBS Studio](https://github.com/obsproject/obs-studio). Adds multi-streaming capability, supporting Twitch, YouTube, Kick, Rumble, TikTok, Joystick, and more with custom RTMP destination.
 
 >Note: Each additional stream will double the uplink/upload bandwidth required to keep streams stable.  
 

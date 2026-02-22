@@ -1,4 +1,5 @@
 // Modified by Adachi Sakura, 2026-02-04: Fixed null pointer dereference in edit-mode constructor
+// Modified by Adachi Sakura, 2026-02-22: Added Joystick.TV service (WizardInfoJoystickTV, 3x3 service grid)
 #include "output-dialog.hpp"
 
 #include <QDialog>
@@ -310,6 +311,7 @@ OutputDialog::OutputDialog(QDialog *parent, QStringList _otherNames) : QDialog(p
 	stackedWidget->addWidget(WizardInfoTrovo());
 	stackedWidget->addWidget(WizardInfoTikTok());
 	stackedWidget->addWidget(WizardInfoFacebook());
+	stackedWidget->addWidget(WizardInfoJoystickTV());
 
 	stackedWidget->setCurrentIndex(0);
 
@@ -375,6 +377,8 @@ OutputDialog::OutputDialog(QDialog *parent, QString name, QString server, QStrin
 	} else if (outputServer.contains(QString::fromUtf8(".fbcdn.net")) ||
 		   outputServer.contains(QString::fromUtf8(".facebook.com"))) { // facebook
 		layout->addWidget(WizardInfoFacebook(true));
+	} else if (outputServer.contains(QString::fromUtf8(".joystick.tv"))) { // joystick.tv
+		layout->addWidget(WizardInfoJoystickTV(true));
 	} else { // unknown
 		layout->addWidget(WizardInfoUnknown(true));
 	}
@@ -384,6 +388,88 @@ OutputDialog::OutputDialog(QDialog *parent, QString name, QString server, QStrin
 	setWindowTitle(obs_module_text("EditOutputWindowTitle"));
 
 	show();
+}
+
+QWidget *OutputDialog::WizardInfoJoystickTV(bool edit)
+{
+	auto page = new QWidget(this);
+	page->setStyleSheet("padding: 0px; margin: 0px;");
+
+	// Layout
+	auto pageLayout = new QVBoxLayout;
+	pageLayout->setSpacing(12);
+
+	// Heading
+	auto title = new QLabel(QString::fromUtf8(obs_module_text(edit ? "JoystickTVServiceInfoEdit" : "JoystickTVServiceInfo")));
+	title->setWordWrap(true);
+	title->setTextFormat(Qt::RichText);
+	pageLayout->addWidget(title);
+
+	// Content
+	auto contentLayout = new QVBoxLayout;
+
+	// Confirm button - initialised here so we can set state in form input connects
+	auto confirmButton = generateButton(QString(obs_module_text(edit ? "SaveOutput" : "CreateOutput")));
+
+	// Form
+	auto formLayout = new QFormLayout;
+	formLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+	formLayout->setLabelAlignment(Qt::AlignRight | Qt::AlignTrailing | Qt::AlignVCenter);
+	formLayout->setSpacing(12);
+
+	// Output name
+	auto outputNameField = generateOutputNameField("JoystickTVOutput", confirmButton, edit);
+	formLayout->addRow(generateFormLabel("OutputName"), outputNameField);
+
+	// Server selection
+	auto serverSelection = generateOutputServerCombo("Joystick.TV", confirmButton, edit);
+	formLayout->addRow(generateFormLabel("JoystickTVServer"), serverSelection);
+
+	// Server info
+	formLayout->addWidget(generateInfoLabel("JoystickTVServerInfo"));
+
+	// Stream key
+	auto outputKeyField = generateOutputKeyField(confirmButton, edit);
+	formLayout->addRow(generateFormLabel("JoystickTVStreamKey"), outputKeyField);
+
+	// Stream key info
+	formLayout->addWidget(generateInfoLabel("JoystickTVStreamKeyInfo"));
+
+	contentLayout->addLayout(formLayout);
+
+	// spacing
+	auto spacer = new QSpacerItem(1, 20, QSizePolicy::Minimum, QSizePolicy::MinimumExpanding);
+	contentLayout->addSpacerItem(spacer);
+
+	pageLayout->addLayout(contentLayout);
+
+	// back button
+	auto serviceButton = edit ? nullptr : generateBackButton();
+
+	// Controls layout
+	auto controlsLayout = generateWizardButtonLayout(confirmButton, serviceButton, edit);
+
+	// confirm button (initialised above so we can set state)
+	connect(confirmButton, &QPushButton::clicked, [this] { acceptOutputs(); });
+
+	// Hook it all together
+	pageLayout->addLayout(controlsLayout, 1);
+	page->setLayout(pageLayout);
+
+	// Defaults for when we're changed to
+	if (!edit) {
+		connect(stackedWidget, &QStackedWidget::currentChanged,
+			[this, outputNameField, serverSelection, outputKeyField, confirmButton] {
+				if (stackedWidget->currentIndex() == 9) {
+					outputName = outputNameField->text();
+					outputServer = serverSelection->currentData().toString();
+					outputKey = outputKeyField->text();
+					validateOutputs(confirmButton);
+				}
+			});
+	}
+
+	return page;
 }
 
 OutputDialog::~OutputDialog()
@@ -406,7 +492,7 @@ QWidget *OutputDialog::WizardServicePage()
 	auto selectionLayout = new QVBoxLayout;
 	selectionLayout->setAlignment(Qt::AlignCenter);
 
-	auto spacerTest = new QSpacerItem(20, 45, QSizePolicy::Fixed, QSizePolicy::Fixed);
+	auto spacerTest = new QSpacerItem(20, 20, QSizePolicy::Fixed, QSizePolicy::Fixed);
 
 	pageLayout->addSpacerItem(spacerTest);
 
@@ -416,19 +502,26 @@ QWidget *OutputDialog::WizardServicePage()
 	rowOne->addWidget(selectionButton("Twitch", platformIconTwitch, 5));
 	rowOne->addWidget(selectionButton("YouTube", platformIconYouTube, 2));
 	rowOne->addWidget(selectionButton("TikTok", platformIconTikTok, 7));
-	rowOne->addWidget(selectionButton("Facebook", platformIconFacebook, 8));
 
 	selectionLayout->addLayout(rowOne);
 
 	// row 2
 	auto rowTwo = new QHBoxLayout;
 
+	rowTwo->addWidget(selectionButton("Facebook", platformIconFacebook, 8));
 	rowTwo->addWidget(selectionButton("Trovo", platformIconTrovo, 6));
 	rowTwo->addWidget(selectionButton("X (Twitter)", platformIconTwitter, 3));
-	rowTwo->addWidget(selectionButton("Kick", platformIconKick, 1));
-	rowTwo->addWidget(selectionButton(obs_module_text("OtherService"), platformIconUnknown, 4));
 
 	selectionLayout->addLayout(rowTwo);
+
+	// row 3
+	auto rowThree = new QHBoxLayout;
+
+	rowThree->addWidget(selectionButton("Kick", platformIconKick, 1));
+	rowThree->addWidget(selectionButton("Joystick.TV", platformIconJoystickTV, 9));
+	rowThree->addWidget(selectionButton(obs_module_text("OtherService"), platformIconUnknown, 4));
+
+	selectionLayout->addLayout(rowThree);
 
 	//
 	pageLayout->addLayout(selectionLayout);

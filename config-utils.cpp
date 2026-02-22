@@ -96,6 +96,8 @@ QIcon ConfigUtils::getPlatformIconFromEndpoint(QString endpoint)
 	} else if (endpoint.contains(QString::fromUtf8(".facebook.com")) ||
 		   endpoint.contains(QString::fromUtf8(".fbcdn.net"))) { // facebook
 		return QIcon(":/aitum/media/facebook.png");
+	} else if (endpoint.contains(QString::fromUtf8(".joystick.tv"))) { // joystick.tv
+		return QIcon(":/aitum/media/joysticktv.png");
 	} else { // unknown
 		return QIcon(":/aitum/media/unknown.png");
 	}

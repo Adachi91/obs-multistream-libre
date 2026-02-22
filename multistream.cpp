@@ -1,3 +1,6 @@
+// Modified by Adachi Sakura, 2026-02-04: Refactored output tracking to ManagedOutput struct
+// Modified by Adachi Sakura, 2026-02-21: Added aggregate stream stats (bitrate, dropped frames)
+// Modified by Adachi Sakura, 2026-02-22: Removed phone-home/advertisement API and file-updater dependency
 #include "config-utils.hpp"
 #include "multistream.hpp"
 #include "obs-module.h"
@@ -15,43 +18,20 @@
 #include <util/config-file.h>
 #include <util/platform.h>
 
-extern "C" {
-#include "file-updater.h"
-}
-
 OBS_DECLARE_MODULE()
 OBS_MODULE_AUTHOR("Aitum");
-OBS_MODULE_USE_DEFAULT_LOCALE("aitum-multistream", "en-US")
+OBS_MODULE_USE_DEFAULT_LOCALE("obs-multistream-libre", "en-US")
 
 static MultistreamDock *multistream_dock = nullptr;
 
-update_info_t *version_update_info = nullptr;
-
-bool version_info_downloaded(void *param, struct file_download_data *file)
-{
-	UNUSED_PARAMETER(param);
-	if (!file || !file->buffer.num)
-		return true;
-
-	QMetaObject::invokeMethod(multistream_dock, "ApiInfo", Q_ARG(QString, QString::fromUtf8((const char *)file->buffer.array)));
-
-	if (version_update_info) {
-		update_info_destroy(version_update_info);
-		version_update_info = nullptr;
-	}
-	return true;
-}
-
 bool obs_module_load(void)
 {
-	blog(LOG_INFO, "[Aitum-Multistream] loaded version %s", PROJECT_VERSION);
+	blog(LOG_INFO, "[Multistream Libre] loaded version %s", PROJECT_VERSION);
 
 	const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 	multistream_dock = new MultistreamDock(main_window);
-	obs_frontend_add_dock_by_id("AitumMultistreamDock", obs_module_text("AitumMultistream"), multistream_dock);
+	obs_frontend_add_dock_by_id("MultistreamLibreDock", obs_module_text("AitumMultistream"), multistream_dock);
 
-	version_update_info = update_info_create_single("[Aitum Multistream]", "OBS", "https://api.aitum.tv/plugin/multi",
-							version_info_downloaded, nullptr);
 	return true;
 }
 
@@ -63,10 +43,6 @@ void obs_module_post_load()
 
 void obs_module_unload()
 {
-	if (version_update_info) {
-		update_info_destroy(version_update_info);
-		version_update_info = nullptr;
-	}
 	if (multistream_dock) {
 		delete multistream_dock;
 	}
@@ -335,7 +311,6 @@ MultistreamDock::MultistreamDock(QWidget *parent) : QFrame(parent)
 		configDialog->LoadSettings(settings);
 		configDialog->LoadVerticalSettings(true);
 		configDialog->LoadOutputStats(&oldVideo);
-		configDialog->SetNewerVersion(newer_version_available);
 		configDialog->setResult(QDialog::Rejected);
 		if (configDialog->exec() == QDialog::Accepted) {
 			if (current_config) {
@@ -489,7 +464,6 @@ void MultistreamDock::OpenSettingsDialog()
 	configDialog->LoadSettings(settings);
 	configDialog->LoadVerticalSettings(true);
 	configDialog->LoadOutputStats(&oldVideo);
-	configDialog->SetNewerVersion(newer_version_available);
 	configDialog->setResult(QDialog::Rejected);
 	if (configDialog->exec() == QDialog::Accepted) {
 		if (current_config) {
@@ -615,12 +589,10 @@ void MultistreamDock::LoadSettingsFile()
 	bfree(path);
 	if (!config) {
 		config = obs_data_create();
-		blog(LOG_WARNING, "[Aitum Multistream] No configuration file loaded");
+		blog(LOG_WARNING, "[Multistream Libre] No configuration file loaded");
 	} else {
-		blog(LOG_INFO, "[Aitum Multistream] Loaded configuration file");
+		blog(LOG_INFO, "[Multistream Libre] Loaded configuration file");
 	}
-	partnerBlockTime = obs_data_get_int(config, "partner_block");
-
 	auto profiles = obs_data_get_array(config, "profiles");
 	auto pc = obs_data_array_count(profiles);
 	obs_data_t *pd = nullptr;
@@ -642,7 +614,7 @@ void MultistreamDock::LoadSettingsFile()
 		current_config = obs_data_create();
 		obs_data_set_string(current_config, "name", profile);
 		bfree(profile);
-		blog(LOG_INFO, "[Aitum Multistream] profile not found");
+		blog(LOG_INFO, "[Multistream Libre] profile not found");
 		LoadSettings();
 		return;
 	}
@@ -786,7 +758,7 @@ void MultistreamDock::LoadOutput(obs_data_t *output_data, bool vertical)
 	} else {
 		connect(streamButton, &QPushButton::clicked, [this, streamButton, output_data] {
 			if (streamButton->isChecked()) {
-				blog(LOG_INFO, "[Aitum Multistream] start stream clicked '%s'",
+				blog(LOG_INFO, "[Multistream Libre] start stream clicked '%s'",
 				     obs_data_get_string(output_data, "name"));
 				if (!StartOutput(output_data, streamButton))
 					streamButton->setChecked(false);
@@ -803,7 +775,7 @@ void MultistreamDock::LoadOutput(obs_data_t *output_data, bool vertical)
 						stop = false;
 				}
 				if (stop) {
-					blog(LOG_INFO, "[Aitum Multistream] stop stream clicked '%s'",
+					blog(LOG_INFO, "[Multistream Libre] stop stream clicked '%s'",
 					     obs_data_get_string(output_data, "name"));
 					const char *name2 = obs_data_get_string(output_data, "name");
 					for (auto it = outputs.begin(); it != outputs.end(); it++) {
@@ -865,9 +837,8 @@ void MultistreamDock::SaveSettings()
 	if (!config) {
 		ensure_directory(path);
 		config = obs_data_create();
-		blog(LOG_WARNING, "[Aitum Multistream] New configuration file");
+		blog(LOG_WARNING, "[Multistream Libre] New configuration file");
 	}
-	obs_data_set_int(config, "partner_block", partnerBlockTime);
 	auto profiles = obs_data_get_array(config, "profiles");
 	if (!profiles) {
 		profiles = obs_data_array_create();
@@ -902,9 +873,9 @@ void MultistreamDock::SaveSettings()
 	obs_data_release(pd);
 
 	if (obs_data_save_json_safe(config, path, "tmp", "bak")) {
-		blog(LOG_INFO, "[Aitum Multistream] Saved settings");
+		blog(LOG_INFO, "[Multistream Libre] Saved settings");
 	} else {
-		blog(LOG_ERROR, "[Aitum Multistream] Failed saving settings");
+		blog(LOG_ERROR, "[Multistream Libre] Failed saving settings");
 	}
 	obs_data_release(config);
 	bfree(path);
@@ -948,7 +919,7 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 			auto main_output = obs_frontend_get_streaming_output();
 			if (!obs_output_active(main_output)) {
 				obs_output_release(main_output);
-				blog(LOG_WARNING, "[Aitum Multistream] failed to start stream '%s' because main was not started",
+				blog(LOG_WARNING, "[Multistream Libre] failed to start stream '%s' because main was not started",
 				     obs_data_get_string(settings, "name"));
 				QMessageBox::warning(this, QString::fromUtf8(obs_module_text("MainOutputNotActive")),
 						     QString::fromUtf8(obs_module_text("MainOutputNotActive")));
@@ -959,7 +930,7 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 			obs_output_release(main_output);
 			if (!venc) {
 				blog(LOG_WARNING,
-				     "[Aitum Multistream] failed to start stream '%s' because encoder index %d was not found",
+				     "[Multistream Libre] failed to start stream '%s' because encoder index %d was not found",
 				     obs_data_get_string(settings, "name"), vei);
 				QMessageBox::warning(this, QString::fromUtf8(obs_module_text("MainOutputEncoderIndexNotFound")),
 						     QString::fromUtf8(obs_module_text("MainOutputEncoderIndexNotFound")));
@@ -973,7 +944,7 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 				obs_data_apply(s, ves);
 				obs_data_release(ves);
 			}
-			std::string video_encoder_name = "aitum_multi_video_encoder_";
+			std::string video_encoder_name = "libre_multi_video_encoder_";
 			video_encoder_name += name;
 			venc = obs_video_encoder_create(venc_name, video_encoder_name.c_str(), s, nullptr);
 			obs_data_release(s);
@@ -995,7 +966,7 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 			auto main_output = obs_frontend_get_streaming_output();
 			if (!obs_output_active(main_output)) {
 				obs_output_release(main_output);
-				blog(LOG_WARNING, "[Aitum Multistream] failed to start stream '%s' because main was not started",
+				blog(LOG_WARNING, "[Multistream Libre] failed to start stream '%s' because main was not started",
 				     obs_data_get_string(settings, "name"));
 				QMessageBox::warning(this, QString::fromUtf8(obs_module_text("MainOutputNotActive")),
 						     QString::fromUtf8(obs_module_text("MainOutputNotActive")));
@@ -1006,7 +977,7 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 			obs_output_release(main_output);
 			if (!aenc) {
 				blog(LOG_WARNING,
-				     "[Aitum Multistream] failed to start stream '%s' because encoder index %d was not found",
+				     "[Multistream Libre] failed to start stream '%s' because encoder index %d was not found",
 				     obs_data_get_string(settings, "name"), aei);
 				QMessageBox::warning(this, QString::fromUtf8(obs_module_text("MainOutputEncoderIndexNotFound")),
 						     QString::fromUtf8(obs_module_text("MainOutputEncoderIndexNotFound")));
@@ -1020,7 +991,7 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 				obs_data_apply(s, aes);
 				obs_data_release(aes);
 			}
-			std::string audio_encoder_name = "aitum_multi_audio_encoder_";
+			std::string audio_encoder_name = "libre_multi_audio_encoder_";
 			audio_encoder_name += name;
 			aenc = obs_audio_encoder_create(aenc_name, audio_encoder_name.c_str(), s,
 							obs_data_get_int(settings, "audio_track"), nullptr);
@@ -1032,7 +1003,7 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 		venc = main_output ? obs_output_get_video_encoder(main_output) : nullptr;
 		if (!venc || !obs_output_active(main_output)) {
 			obs_output_release(main_output);
-			blog(LOG_WARNING, "[Aitum Multistream] failed to start stream '%s' because main was not started",
+			blog(LOG_WARNING, "[Multistream Libre] failed to start stream '%s' because main was not started",
 			     obs_data_get_string(settings, "name"));
 			QMessageBox::warning(this, QString::fromUtf8(obs_module_text("MainOutputNotActive")),
 					     QString::fromUtf8(obs_module_text("MainOutputNotActive")));
@@ -1068,7 +1039,7 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 	//use_auth
 	//username
 	//password
-	std::string service_name = "aitum_multi_service_";
+	std::string service_name = "libre_multi_service_";
 	service_name += name;
 	auto service = obs_service_create(whip ? "whip_custom" : "rtmp_custom", service_name.c_str(), s, nullptr);
 	obs_data_release(s);
@@ -1082,7 +1053,7 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 			type = "ffmpeg_mpegts_muxer";
 		}
 	}
-	std::string output_name = "aitum_multi_output_";
+	std::string output_name = "libre_multi_output_";
 	output_name += name;
 	auto output = obs_output_create(type, output_name.c_str(), nullptr, nullptr);
 	obs_output_set_service(output, service);
@@ -1178,86 +1149,6 @@ void MultistreamDock::stream_output_stop(void *data, calldata_t *calldata)
 		break;
 	}
 	//const char *last_error = (const char *)calldata_ptr(calldata, "last_error");
-}
-
-void MultistreamDock::ApiInfo(QString info)
-{
-	auto d = obs_data_create_from_json(info.toUtf8().constData());
-	if (!d)
-		return;
-	auto data_obj = obs_data_get_obj(d, "data");
-	obs_data_release(d);
-	if (!data_obj)
-		return;
-	auto version = obs_data_get_string(data_obj, "version");
-	int major;
-	int minor;
-	int patch;
-	if (sscanf(version, "%d.%d.%d", &major, &minor, &patch) == 3) {
-		auto sv = MAKE_SEMANTIC_VERSION(major, minor, patch);
-		if (sv > MAKE_SEMANTIC_VERSION(PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, PROJECT_VERSION_PATCH)) {
-			newer_version_available = QString::fromUtf8(version);
-			configButton->setStyleSheet(QString::fromUtf8("background: rgb(192,128,0);"));
-		}
-	}
-        /* time_t current_time = time(nullptr);
-	if (current_time < partnerBlockTime || current_time - partnerBlockTime > 1209600) {
-		obs_data_array_t *blocks = obs_data_get_array(data_obj, "partnerBlocks");
-		size_t count = obs_data_array_count(blocks);
-		size_t added_count = 0;
-		for (size_t i = count; i > 0; i--) {
-			obs_data_t *block = obs_data_array_item(blocks, i - 1);
-			auto block_type = obs_data_get_string(block, "type");
-			QBoxLayout *layout = nullptr;
-			if (strcmp(block_type, "LINK") == 0) {
-				auto button = new QPushButton(QString::fromUtf8(obs_data_get_string(block, "label")));
-				button->setStyleSheet(QString::fromUtf8(obs_data_get_string(block, "qss")));
-				auto url = QString::fromUtf8(obs_data_get_string(block, "data"));
-				connect(button, &QPushButton::clicked, [url] { QDesktopServices::openUrl(QUrl(url)); });
-				auto buttonRow = new QHBoxLayout;
-				buttonRow->setContentsMargins(8, 0, 8, 0);
-				buttonRow->setSpacing(8);
-				buttonRow->addWidget(button);
-				layout = buttonRow;
-			} else if (strcmp(block_type, "IMAGE") == 0) {
-				auto image_data = QString::fromUtf8(obs_data_get_string(block, "data"));
-				if (image_data.startsWith("data:image/")) {
-					auto pos = image_data.indexOf(";");
-					auto format = image_data.mid(11, pos - 11);
-					QImage image;
-					if (image.loadFromData(QByteArray::fromBase64(image_data.mid(pos + 7).toUtf8().constData()),
-							       format.toUtf8().constData())) {
-						auto label = new AspectRatioPixmapLabel;
-						label->setPixmap(QPixmap::fromImage(image));
-						label->setAlignment(Qt::AlignCenter);
-						label->setStyleSheet(QString::fromUtf8(obs_data_get_string(block, "qss")));
-						auto labelRow = new QHBoxLayout;
-						labelRow->addWidget(label, 1, Qt::AlignCenter);
-						layout = labelRow;
-					}
-				}
-			}
-			if (layout) {
-				added_count++;
-				if (i == 1) {
-					auto closeButton = new QPushButton("🞫");
-					connect(closeButton, &QPushButton::clicked, [this, added_count] {
-						for (size_t j = 0; j < added_count; j++) {
-							auto item = mainLayout->takeAt(1);
-							RemoveLayoutItem(item);
-						}
-						partnerBlockTime = time(nullptr);
-						SaveSettings();
-					});
-					layout->addWidget(closeButton);
-				}
-				mainLayout->insertLayout(1, layout, 0);
-			}
-			obs_data_release(block);
-		}
-		obs_data_array_release(blocks);
-	}*/
-	obs_data_release(data_obj);
 }
 
 void MultistreamDock::LoadVerticalOutputs(bool firstLoad)

@@ -1,3 +1,4 @@
+// Modified by Adachi Sakura, 2026-02-04: Fixed null pointer dereference in edit-mode constructor
 #include "output-dialog.hpp"
 
 #include <QDialog>

@@ -1,3 +1,4 @@
+// Modified by Adachi Sakura, 2026-02-22: Removed SetNewerVersion declaration and newVersion member
 #pragma once
 
 #include <QCheckBox>
@@ -53,8 +54,6 @@ private:
 
 	QFormLayout *mainOutputsLayout;
 	QFormLayout *verticalOutputsLayout;
-	QLabel *newVersion;
-
 	QTextEdit *troubleshooterText;
 
 	QPushButton *verticalAddButton;
@@ -82,7 +81,6 @@ public:
 	void LoadVerticalSettings(bool load);
 	void SaveVerticalSettings();
 	void LoadOutputStats(std::vector<video_t *> *oldVideos);
-	void SetNewerVersion(QString newer_version_available);
 
 public slots:
 };

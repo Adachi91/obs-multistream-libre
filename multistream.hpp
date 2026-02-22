@@ -1,3 +1,5 @@
+// Modified by Adachi Sakura, 2026-02-21: Added ManagedOutput struct with per-output stats fields
+// Modified by Adachi Sakura, 2026-02-22: Removed newer_version_available, partnerBlockTime, ApiInfo slot
 #pragma once
 
 #include "config-dialog.hpp"
@@ -31,9 +33,6 @@ private:
     QLabel *droppedFramesLabel = nullptr;
 	QLabel *mainPlatformIconLabel = nullptr;
 	QString mainPlatformUrl;
-
-	QString newer_version_available;
-	time_t partnerBlockTime = 0;
 
 	QTimer videoCheckTimer;
     QTimer statsUpdateTimer;
@@ -74,9 +73,6 @@ private:
 
 	static void stream_output_stop(void *data, calldata_t *calldata);
 	static void stream_output_start(void *data, calldata_t *calldata);
-
-private slots:
-	void ApiInfo(QString info);
 
 public:
 	MultistreamDock(QWidget *parent = nullptr);

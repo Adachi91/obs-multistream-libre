@@ -33,15 +33,15 @@
     },
     "platformConfig": {
         "macos": {
-            "bundleId": "tv.aitum.multi"
+            "bundleId": "io.obs.multistream-libre"
         }
     },
-    "name": "aitum-multistream",
-    "displayName": "Aitum Multistream",
+    "name": "obs-multistream-libre",
+    "displayName": "Multistream Libre",
     "version": "1.0.7",
-    "author": "Aitum",
-    "website": "https://aitum.tv",
-    "email": "support@aitum.tv",
+    "author": "Adachi Sakura",
+    "website": "https://adachi.wiki",
+    "email": "adachi9119@gmail.com",
     "uuids": {
         "windowsApp": "7E8814F2-03EE-4E2E-8062-A9A184EC0618"
     }

@@ -473,9 +473,9 @@ MultistreamDock::MultistreamDock(QWidget *parent) : QFrame(parent)
 		calldata_free(&cd);
 	});
 	videoCheckTimer.start(500);
-        connect(&statsUpdateTimer, &QTimer::timeout, this, &MultistreamDock::UpdateAggregateStats);
-        statsUpdateTimer.start(1000);
-        UpdateAggregateStats();
+	connect(&statsUpdateTimer, &QTimer::timeout, this, &MultistreamDock::UpdateAggregateStats);
+	statsUpdateTimer.start(2000);
+	UpdateAggregateStats();
 	LoadSettingsFile();
 }
 

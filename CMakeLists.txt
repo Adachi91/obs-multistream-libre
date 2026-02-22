@@ -1,3 +1,4 @@
+# Modified by Adachi Sakura, 2026-02-22: Removed CURL dependency and file-updater sources
 # --- Detect if the plugin is build out of tree or not ---
 if(CMAKE_PROJECT_NAME STREQUAL "obs-studio")
   set(BUILD_OUT_OF_TREE OFF)
@@ -41,11 +42,6 @@ PROPERTIES AUTOMOC ON
             AUTOUIC ON
             AUTORCC ON)
 
-if(BUILD_OUT_OF_TREE)
-  find_package(CURL REQUIRED)
-endif()
-target_link_libraries(${PROJECT_NAME} PRIVATE CURL::libcurl)
-
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/version.h.in ${CMAKE_CURRENT_SOURCE_DIR}/version.h)
 
 if(OS_WINDOWS)
@@ -58,14 +54,12 @@ target_sources(${PROJECT_NAME} PRIVATE
   output-dialog.cpp
   stream-key-input.cpp
   multistream.cpp
-  file-updater.c
 	resources.qrc
 	config-dialog.hpp
 	config-utils.hpp
 	output-dialog.hpp
 	stream-key-input.hpp
-    multistream.hpp
-	file-updater.h)
+    multistream.hpp)
 
 if(BUILD_OUT_OF_TREE)
 	set_target_properties_plugin(${PROJECT_NAME} PROPERTIES OUTPUT_NAME ${_name})
